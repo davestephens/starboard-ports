@@ -1,0 +1,255 @@
+diff -ruN a/fileutil.c b/fileutil.c
+--- a/fileutil.c
++++ b/fileutil.c
+@@ -74,6 +74,8 @@
+ #include "engglobs.h"
+ #include "fileutil.h"
+ 
++void HandleError (char *, int);
++
+ /* GCS: This is from dcgettext.c in the gettext package.      */
+ /* XPG3 defines the result of `setlocale (category, NULL)' as:
+    ``Directs `setlocale()' to query `category' and return the current
+@@ -818,4 +820,3 @@
+     fclose (fp);
+ #endif
+ }
+-
+diff -ruN a/lcx11.c b/lcx11.c
+--- a/lcx11.c
++++ b/lcx11.c
+@@ -18,6 +18,7 @@
+ #include <X11/Xutil.h>
+ #include <X11/keysym.h>
+ #include <X11/keysymdef.h>
++#include <X11/cursorfont.h>
+ #include "lin-city.h"
+ #include "lctypes.h"
+ #include "cliglobs.h"
+@@ -26,6 +27,9 @@
+ #include "mouse.h"
+ #include "screen.h"
+ 
++static int resize_ready = 0;
++static int pending_w = 0, pending_h = 0;
++
+ #ifndef M_PI
+ #define M_PI            3.14159265358979323846
+ #endif
+@@ -359,6 +363,8 @@
+ 				 DefaultVisual (display.dpy, display.screen),
+ 				 /*      PseudoColor,  */
+ 				 vmask, &xswa);
++    XDefineCursor (display.dpy, display.win,
++		   XCreateFontCursor (display.dpy, XC_left_ptr));
+ 
+     sizehint.x = winX - 100;
+     sizehint.y = winY;
+@@ -427,6 +433,14 @@
+     }
+ }
+ 
++void
++apply_pending_resize (void)
++{
++    resize_ready = 1;
++    if (pending_w > 0 && pending_h > 0)
++	resize_geometry (pending_w, pending_h);
++}
++
+ void 
+ unlock_window_size (void) 
+ {
+@@ -898,7 +912,14 @@
+ 	    while (XCheckTypedEvent(display.dpy, ConfigureNotify, &loop_ev)) {
+ 		ev = (XConfigureEvent *) &loop_ev;
+ 	    }
+-	    resize_geometry (ev->width, ev->height);
++	    /* A window manager can resize the window before the game screen
++	       exists; drawing it then crashes, so the size waits. */
++	    if (resize_ready) {
++		resize_geometry (ev->width, ev->height);
++	    } else {
++		pending_w = ev->width;
++		pending_h = ev->height;
++	    }
+ 	}
+ 	break;
+     }
+diff -ruN a/lcx11.h b/lcx11.h
+--- a/lcx11.h
++++ b/lcx11.h
+@@ -67,6 +67,8 @@
+ 
+ void parse_xargs (int, char **, char **);
+ void set_pointer_confinement (void);
++void unlock_window_size (void);
++void apply_pending_resize (void);
+ void do_setcustompalette (XColor *);
+ void Create_Window (char *);
+ void HandleError (char *, int);
+diff -ruN a/ldsvgui.c b/ldsvgui.c
+--- a/ldsvgui.c
++++ b/ldsvgui.c
+@@ -99,7 +99,6 @@
+ char LIBDIR[256];
+ #endif
+ 
+-char *lc_save_dir;
+ char save_names[10][42];
+ 
+ /* ---------------------------------------------------------------------- *
+diff -ruN a/ldsvguts.c b/ldsvguts.c
+--- a/ldsvguts.c
++++ b/ldsvguts.c
+@@ -91,7 +91,7 @@
+  * Private Global Variables
+  * ---------------------------------------------------------------------- */
+ 
+-char save_names[10][42];
++extern char save_names[10][42];
+ 
+ /* ---------------------------------------------------------------------- *
+  * Public functions
+diff -ruN a/lintypes.c b/lintypes.c
+--- a/lintypes.c
++++ b/lintypes.c
+@@ -3,6 +3,7 @@
+  * This file is part of lincity.
+  * Lincity is copyright (c) I J Peters 1995-1997, (c) Greg Sharp 1997-2001.
+  * ---------------------------------------------------------------------- */
++#include <string.h>
+ #include "lcconfig.h"
+ #include "lin-city.h"
+ #include "engglobs.h"
+diff -ruN a/main.c b/main.c
+--- a/main.c
++++ b/main.c
+@@ -94,10 +94,6 @@
+ #endif
+ #endif
+ 
+-char *lc_save_dir;
+-char *lc_temp_file;
+-char save_names[10][42];
+-
+ #ifdef CS_PROFILE
+ int prof_countdown = PROFILE_COUNTDOWN;
+ #endif
+@@ -278,6 +274,9 @@
+     mouse_initialized = 1;
+     //set_selected_module (CST_TRACK_LR);
+     screen_setup ();
++#if defined (LC_X11)
++    apply_pending_resize ();
++#endif
+ 
+     /* Main loop! */
+     client_main_loop ();
+@@ -860,4 +859,3 @@
+     sprintf (s, "%s%c%s", lc_save_dir, PATH_SLASH, RESULTS_FILENAME);
+     ok_dial_box (s, RESULTS, 0L);
+ }
+-
+diff -ruN a/mouse.c b/mouse.c
+--- a/mouse.c
++++ b/mouse.c
+@@ -1056,7 +1056,7 @@
+    and set to 1 if the existing transport if the more expensive sort
+    (e.g. GROUP_RAIL when overwriting GROUP_ROAD).
+ */
+-inline int
++static int
+ mt_erase(int x, int y)
+ {
+     if (x < 0 || y < 0 || x >= WORLD_SIDE_LEN || y >= WORLD_SIDE_LEN)
+@@ -1093,7 +1093,7 @@
+     return 0;
+ }
+ 
+-inline int
++static int
+ mt_temp(int x, int y)
+ {
+     if (x < 0 || y < 0 || x >= WORLD_SIDE_LEN || y >= WORLD_SIDE_LEN)
+@@ -1127,7 +1127,7 @@
+     return 0;
+ }
+ 
+-inline int
++static int
+ mt_perm(int x, int y)
+ {
+     /* By now, it has already been mt_erase()'d */
+@@ -1151,7 +1151,7 @@
+ }
+ 
+ int
+-do_mt_draw (int x1, int x2, int y1, int y2, int (*mode)())
++do_mt_draw (int x1, int x2, int y1, int y2, int (*mode)(int, int))
+ {
+     int dir = 1;
+     int horiz = 1;
+diff -ruN a/pixmap.c b/pixmap.c
+--- a/pixmap.c
++++ b/pixmap.c
+@@ -390,7 +390,7 @@
+ 		  likes it in the file.  Still need to fix this in autoconf,
+                   but for now this will do. */
+ #if !defined (WIN32)
+-inline int 
++int
+ pixmap_index (int x, int y)
+ {
+     return y*pixmap_width + x;
+diff -ruN a/pixmap.h b/pixmap.h
+--- a/pixmap.h
++++ b/pixmap.h
+@@ -19,7 +19,7 @@
+ void initialize_pixmap (void);
+ void resize_pixmap (int new_width, int new_height);
+ int pixmap_getpixel (int x, int y);
+-inline int pixmap_index (int x, int y);
++int pixmap_index (int x, int y);
+ int pixmap_getpixel (int x, int y);
+ void pixmap_setpixel (int x, int y, int col);
+ void pixmap_hline (int x1, int y1, int x2, int col);
+@@ -33,7 +33,7 @@
+  * Public Inline Functions
+  * ---------------------------------------------------------------------- */
+ #if defined (WIN32)
+-inline int 
++static inline int 
+ pixmap_index (int x, int y) {
+     return y*pixmap_width + x;
+ }
+diff -ruN a/power.c b/power.c
+--- a/power.c
++++ b/power.c
+@@ -6,6 +6,7 @@
+  * ---------------------------------------------------------------------- */
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include "lclib.h"
+ #include "common.h"
+ #include "lctypes.h"
+diff -ruN a/screen.h b/screen.h
+--- a/screen.h
++++ b/screen.h
+@@ -20,8 +20,8 @@
+ extern unsigned char start_font2[4096];
+ extern unsigned char start_font3[4096];
+ 
+-int monthgraph_style;
+-int mps_global_style;
++extern int monthgraph_style;
++extern int mps_global_style;
+ 
+ /* This is on in screen_full_refresh, used in *_refresh() */
+ extern char screen_refreshing;
+@@ -64,4 +64,3 @@
+ #define CB_SPACE 20 // space between checkbuttons for market/port
+ 
+ #endif	/* __screen_h__ */
+-

@@ -1,0 +1,34 @@
+{
+  "version": 4,
+  "name": "lincity.zip",
+  "items": [
+    "LinCity.sh",
+    "lincity"
+  ],
+  "items_opt": [],
+  "attr": {
+    "title": "LinCity",
+    "porter": [
+      "davestephens"
+    ],
+    "desc": "Build a city and keep it alive. Feed, house and employ your people, trade with other cities and manage pollution and power. Build a sustainable economy, or build rockets and leave the planet. LinCity is the free city simulation from 1995.",
+    "desc_md": null,
+    "inst": "Ready to run out of the box, no additional files needed.",
+    "inst_md": null,
+    "genres": [
+      "simulation",
+      "strategy"
+    ],
+    "image": null,
+    "rtr": true,
+    "exp": false,
+    "runtime": [
+      "weston_pkg_0.2"
+    ],
+    "store": [],
+    "availability": "full",
+    "reqs": [],
+    "arch": [],
+    "min_glibc": ""
+  }
+}

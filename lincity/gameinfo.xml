@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gameList>
+  <game>
+    <path>./LinCity.sh</path>
+    <name>LinCity</name>
+    <desc>Build a city and keep it alive. Feed, house and employ your people, trade with other cities and manage pollution and power. Build a sustainable economy, or build rockets and leave the planet. LinCity is the free city simulation from 1995.</desc>
+    <releasedate>20040814T000000</releasedate>
+    <developer>I J Peters, Greg Sharp</developer>
+    <publisher>I J Peters, Greg Sharp</publisher>
+    <genre>Simulation</genre>
+    <image>./lincity/screenshot.jpg</image>
+  </game>
+</gameList>
