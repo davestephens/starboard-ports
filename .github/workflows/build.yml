@@ -1,0 +1,84 @@
+name: Build
+
+# Pull requests build every port and check the catalogue. Pushes to main also publish
+# what changed to the ports-latest release.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    outputs:
+      ports: ${{ steps.ports.outputs.ports }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generator tests
+        run: python3 -m unittest discover -s tools -v
+      - name: Shellcheck
+        run: shellcheck tools/*.sh ports/*/build.sh ports/*/starboard-test.sh
+      - name: List ports
+        id: ports
+        run: |
+          echo "ports=$(cd ports && ls -d */ | tr -d / | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split()))')" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        port: ${{ fromJSON(needs.test.outputs.ports) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache downloads and dependencies
+        uses: actions/cache@v4
+        with:
+          path: ports/${{ matrix.port }}/build
+          key: build-${{ matrix.port }}-${{ hashFiles(format('ports/{0}/build.sh', matrix.port), format('ports/{0}/Dockerfile', matrix.port)) }}
+      - name: Build
+        run: ports/${{ matrix.port }}/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: port-${{ matrix.port }}
+          path: ports/${{ matrix.port }}/dist
+          if-no-files-found: error
+
+  catalogue:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: port-*
+          path: artifacts
+      - name: Put the zips back in ports/*/dist
+        run: |
+          for dir in artifacts/port-*; do
+            port=${dir#artifacts/port-}
+            mkdir -p "ports/$port/dist"
+            cp -r "$dir/." "ports/$port/dist/"
+          done
+      - name: Publish
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/publish.sh --skip-build
+      - name: Check the catalogue
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        run: tools/publish.sh --skip-build --dry-run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogue
+          path: build/catalogue
