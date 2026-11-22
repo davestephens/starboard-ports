@@ -1,0 +1,34 @@
+{
+  "version": 4,
+  "name": "lincity-ng.zip",
+  "items": [
+    "LinCityNG.sh",
+    "lincity-ng"
+  ],
+  "items_opt": [],
+  "attr": {
+    "title": "LinCity-NG",
+    "porter": [
+      "davestephens"
+    ],
+    "desc": "Build and run a city. Zone housing and industry, lay out roads, rail and power, and balance jobs, food, pollution and money. Win by building a sustainable economy, or by evacuating your citizens in spaceships. LinCity-NG is the polished successor to the classic LinCity.",
+    "desc_md": null,
+    "inst": "Ready to run out of the box, no additional files needed.",
+    "inst_md": null,
+    "genres": [
+      "simulation",
+      "strategy"
+    ],
+    "image": null,
+    "rtr": true,
+    "exp": false,
+    "runtime": [],
+    "store": [],
+    "availability": "full",
+    "reqs": [],
+    "arch": [
+      "aarch64"
+    ],
+    "min_glibc": "2.35"
+  }
+}

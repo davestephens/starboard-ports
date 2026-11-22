@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gameList>
+  <game>
+    <path>./LinCityNG.sh</path>
+    <name>LinCity-NG</name>
+    <desc>Build and run a city. Zone housing and industry, lay out roads, rail and power, and balance jobs, food, pollution and money. Win by building a sustainable economy, or by evacuating your citizens in spaceships. LinCity-NG is the polished successor to the classic LinCity.</desc>
+    <releasedate>20250922T000000</releasedate>
+    <developer>LinCity-NG developers</developer>
+    <publisher>LinCity-NG developers</publisher>
+    <genre>Simulation</genre>
+    <image>./lincity-ng/screenshot.jpg</image>
+  </game>
+</gameList>
