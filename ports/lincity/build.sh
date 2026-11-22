@@ -1,7 +1,8 @@
 #!/bin/bash
 # Builds xlincity for aarch64 from the upstream 1.12.1 tarball plus the port's patch,
 # fills lincity/lincity/ with the binary and game data, and zips the port into dist/.
-# Needs Docker with arm64 emulation (docker run --privileged --rm tonistiigi/binfmt --install arm64).
+# dist/source/ gets the tarball and patch the binary was built from.
+# On an x86 host, Docker needs arm64 emulation (docker run --privileged --rm tonistiigi/binfmt --install arm64).
 set -euo pipefail
 
 here="$(cd -- "$(dirname "$0")" && pwd)"
@@ -43,13 +44,15 @@ cp "$src/xlincity.aarch64" "$game/"
 
 # A PortMaster release zip carries the metadata inside the game folder.
 stage="$work/zip"
-rm -rf "$stage"
-mkdir -p "$stage" "$here/dist"
+rm -rf "$stage" "$here/dist"
+mkdir -p "$stage" "$here/dist/source"
 cp "$port/LinCity.sh" "$stage/"
 cp -r "$game" "$stage/lincity"
-for f in port.json gameinfo.xml README.md screenshot.jpg cover.jpg; do
-    if [ -f "$port/$f" ]; then cp "$port/$f" "$stage/lincity/"; fi
-done
-rm -f "$here/dist/lincity.zip"
-(cd "$stage" && zip -qr "$here/dist/lincity.zip" LinCity.sh lincity)
+rm -rf "$stage/lincity/conf" "$stage/lincity/log.txt"
+cp "$port/port.json" "$port/gameinfo.xml" "$port/README.md" "$port/screenshot.jpg" "$port/cover.jpg" \
+    "$stage/lincity/"
+python3 "$here/../../tools/zip_port.py" "$here/dist/lincity.zip" "$stage"
+
+# The corresponding source for the GPL binary, attached to the catalogue release.
+cp "$work/$tarball" "$game/patches/lincity-1.12.1-portmaster.patch" "$here/dist/source/"
 echo "Built $game/xlincity.aarch64 and $here/dist/lincity.zip"

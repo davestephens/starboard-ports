@@ -23,7 +23,7 @@
     "rtr": true,
     "exp": false,
     "runtime": [
-      "weston_pkg_0.2"
+      "weston_pkg_0.2.squashfs"
     ],
     "store": [],
     "availability": "full",

@@ -1,59 +1,119 @@
-# LinCity port
+# Starboard Ports
 
-A PortMaster port of LinCity 1.12.1, the X11 city simulation. `lincity/` is laid out as
-`ports/lincity/` in [PortMaster-New](https://github.com/PortsMaster/PortMaster-New) and is the
-folder a PR would add.
+Linux game ports for Starboard, the Android app that runs PortMaster ports, published as a
+PortMaster-style catalogue. Starboard adds it like any other port source, and the ports then
+install, update and show in the library like PortMaster's own.
+
+| Port | Game | Runs on |
+|---|---|---|
+| [`lincity`](ports/lincity) | LinCity 1.12.1, the original X11 city simulation | Westonpack runtime (downloaded from PortMaster) |
+| [`lincity-ng`](ports/lincity-ng) | LinCity-NG 2.14.2 | Native SDL2, no runtime |
+
+## Add the catalogue to Starboard
+
+In Starboard, go to Settings > Port sources, choose Add source, and paste:
 
 ```
-lincity/                    the port
-  LinCity.sh                launcher (Westonpack, drm/system mode: the game draws with Xlib)
-  port.json, gameinfo.xml, README.md, screenshot.jpg, cover.jpg
-  lincity/
-    lincity.ini             gptokeyb2 controls
-    licenses/               one LICENSE.<component>.txt per component
-    patches/                applied to the upstream tarball by build.sh
-    xlincity.aarch64, data/ built by build.sh (not tracked)
-build.sh                    builds the binary and data, writes dist/lincity.zip
-Dockerfile                  arm64 bullseye build image (glibc 2.31)
-starboard-test.sh           copies the port to a device running Starboard and launches it
+https://github.com/davestephens/starboard-ports/releases/download/ports-latest/starboard.source.json
 ```
 
-## Build
+Ports install into `Starboard/ports.starboard/` and any runtimes into `Starboard/libs.starboard/`.
+
+The catalogue follows PortMaster's `PortMasterV3` format, so harbourmaster can read it too, but
+the ports are built and tested for Starboard only. LinCity-NG needs glibc 2.35, which older
+handheld firmwares lack.
+
+## Layout
+
+```
+catalogue.json              the source's prefix, name and GitHub repo
+ports/<port>/
+  build.sh                  builds the game in Docker and writes dist/<port>.zip and dist/source/
+  Dockerfile                the arm64 build image
+  starboard-test.sh         copies the built port to a device and launches it
+  README.md                 how the port was made
+  <port>/                   the port folder, laid out as in PortMaster-New
+tools/
+  zip_port.py               writes a port zip that is byte-identical for an unchanged build
+  catalogue.py              writes ports.json, images.zip and starboard.source.json
+  publish.sh                builds, writes the catalogue and uploads what changed to a release
+  test_catalogue.py         tests for the two Python tools
+```
+
+## Build a port
 
 ```bash
-./build.sh
+ports/lincity-ng/build.sh
 ```
 
-It downloads the upstream tarball from Debian's archive (SourceForge serves scripts an HTML
-page), checks its SHA-256, applies the patch and builds in Docker under arm64 emulation.
-`dist/lincity.zip` is laid out like a PortMaster release zip: `port.json`, `gameinfo.xml` and
-the images sit inside `lincity/`.
-
-The patch is the upstream source plus:
-
-- the modern-GCC fixes from [davestephens/lincity](https://github.com/davestephens/lincity)
-- an `XC_left_ptr` cursor on the game window, which otherwise inherits the root window's
-- a deferred resize. lincity locks its window size during the opening screen, but Weston's
-  kiosk shell and matchbox make it full screen anyway. The ConfigureNotify arrives while the
-  opening screen waits for MapNotify, and `resize_geometry` then draws the month graph before
-  it is allocated (segfault in `do_history_linegraph`). The patch stores that size and applies
-  it after `screen_setup`.
-
-## Test on Starboard
+Each build runs in an arm64 Debian container. On an x86 machine, Docker needs arm64 emulation
+first:
 
 ```bash
-./starboard-test.sh [adb-serial]
+docker run --privileged --rm tonistiigi/binfmt --install arm64
 ```
 
-The port is not in a catalogue, so it does not show in Starboard's games list. The script
-launches it with an intent. The opening screen waits for a key: press Start.
+A build writes:
 
-## Display size
+- `dist/<port>.zip`, laid out like a PortMaster release zip: the launcher `.sh` and `<port>/`
+  at the top, with `port.json`, `gameinfo.xml`, `README.md`, `screenshot.jpg` and `cover.jpg`
+  inside `<port>/`
+- `dist/source/`, holding the source tarballs and patches the binary was built from
 
-LinCity 1.12 reflows its UI to any window from 640x480 up, so the full-screen window Weston
-(or Starboard's Xvfb, 1280x720) gives it shows more map, not bigger pixels. The `-d` pixel
-doubling flag needs 960 lines and does not fit a 720-line screen. The opening screen is a
-fixed 640x480 image and sits in the top-left corner of a larger screen.
+To try a build on a device running Starboard, use `ports/<port>/starboard-test.sh [adb-serial]`.
+It copies the port into `Starboard/ports.local/` and launches it, so it needs a Starboard build
+that knows the sideloaded `local` source.
 
-On Starboard the pointer does not show. Starboard's `westonwrap.sh` starts matchbox with
-`-use_cursor no`, which hides the X cursor even over a window that sets its own.
+## The catalogue
+
+`tools/catalogue.py` reads every `ports/*/dist/*.zip` and writes:
+
+- `ports.json`, where each entry is the port's own `port.json` plus a `source` block with the
+  zip's URL, md5, size, `date_added` and `date_updated`
+- `images.zip`, holding `<port>.screenshot.jpg` and `<port>.cover.jpg` from each zip
+- `starboard.source.json`, the descriptor Starboard is given, pointing at `ports.json`
+
+It rejects a zip without a launcher at the top, without `<port>/port.json`, whose `port.json`
+name or `items` do not match the zip, or without a screenshot and cover.
+
+`date_added` is kept from the published `ports.json`. `date_updated` changes only when a
+zip's md5 does. Zips are written with fixed timestamps, so rebuilding unchanged code does not
+offer players an update.
+
+The runtimes a port needs are not in this catalogue. Starboard fetches any runtime an added
+source does not list from PortMaster's own catalogue.
+
+## Publishing
+
+CI publishes on every push to `main`: the `Build` workflow builds each port natively on a
+GitHub arm64 runner, writes the catalogue and uploads what changed to the `ports-latest`
+release. Pull requests build and check the catalogue without publishing.
+
+To publish by hand, with the `gh` CLI logged in and the commit pushed:
+
+```bash
+tools/publish.sh                     # build everything and publish to ports-latest
+tools/publish.sh --tag ports-test    # publish to another release, for testing
+tools/publish.sh --skip-build --dry-run
+```
+
+Only changed files are uploaded: port zips and their source first, then `images.zip`, then
+`ports.json`. The release tag is moved to the published commit, so GitHub's source archive on
+the release matches the build scripts that made it.
+
+## Adding a port
+
+1. Create `ports/<port>/` with a `build.sh` that writes `dist/<port>.zip` (use
+   `tools/zip_port.py`) and copies the corresponding source into `dist/source/`.
+2. Put the port folder at `ports/<port>/<port>/`: the launcher, `port.json` (its `name` is
+   `<port>.zip` and its `items` list the zip's top level), `gameinfo.xml`, `README.md`,
+   `screenshot.jpg`, `cover.jpg` and the game folder with its `licenses/`.
+3. Run `tools/publish.sh --dry-run` and open a pull request.
+
+CI finds new ports by listing `ports/`.
+
+## Licences
+
+The scripts and tools in this repository are MIT licensed (see [LICENSE](LICENSE)). Each game
+keeps its own licence. The texts are in `ports/<port>/<port>/<port>/licenses/`, and every
+release carries the source each binary was built from.
