@@ -17,7 +17,7 @@ jobs:
     outputs:
       ports: ${{ steps.ports.outputs.ports }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generator tests
         run: python3 -m unittest discover -s tools -v
       - name: Shellcheck
@@ -35,15 +35,15 @@ jobs:
       matrix:
         port: ${{ fromJSON(needs.test.outputs.ports) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cache downloads and dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ports/${{ matrix.port }}/build
           key: build-${{ matrix.port }}-${{ hashFiles(format('ports/{0}/build.sh', matrix.port), format('ports/{0}/Dockerfile', matrix.port)) }}
       - name: Build
         run: ports/${{ matrix.port }}/build.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: port-${{ matrix.port }}
           path: ports/${{ matrix.port }}/dist
@@ -58,8 +58,8 @@ jobs:
       group: publish-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: port-*
           path: artifacts
@@ -78,7 +78,7 @@ jobs:
       - name: Check the catalogue
         if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
         run: tools/publish.sh --skip-build --dry-run
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: catalogue
           path: build/catalogue
