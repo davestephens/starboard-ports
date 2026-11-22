@@ -89,7 +89,12 @@ CI publishes on every push to `main`: the `Build` workflow builds each port nati
 GitHub arm64 runner, writes the catalogue and uploads what changed to the `ports-latest`
 release. Pull requests build and check the catalogue without publishing.
 
-To publish by hand, with the `gh` CLI logged in and the commit pushed:
+A build is byte-identical from one CI run to the next, but a local build is not identical to
+CI's: the same zip built on another machine has a different md5, and publishing it offers
+players an update. Leave `ports-latest` to CI.
+
+To publish by hand, for example to a test release, with the `gh` CLI logged in and the commit
+pushed:
 
 ```bash
 tools/publish.sh                     # build everything and publish to ports-latest
